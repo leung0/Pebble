@@ -1,0 +1,18 @@
+#include <pebble.h>
+
+#define KEY_BUTTON    0
+#define KEY_VIBRATE   1
+#define BUTTON_UP    0
+#define BUTTON_SELECT   1
+#define BUTTON_DOWN   2
+
+static Window *s_main_window;
+static TextLayer *s_text_layer;
+
+static void send(int key, int message)
+{
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+  dict_write_int(iter, key, &message, sizeof(int), true);
+  app_message_outbox_send();
+}
