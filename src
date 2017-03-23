@@ -16,3 +16,117 @@ static void send(int key, int message)
   dict_write_int(iter, key, &message, sizeof(int), true);
   app_message_outbox_send();
 }
+static void inbox_received_handler(DictionaryIterator *iterator, void *context)
+{
+  Tuple *t = dict_read_first(iterator);
+  
+  while(t != NULL)
+  {
+    switch(t->key)
+    {
+      case KEY_VIBRATE:
+      text_layer_set_text(s_text_layer, "Vibrate!");
+      vibes_short_pulse();
+      break;
+      default:
+      APP_LOG(APP_LOG_LEVEL_INFO, "unknown key: %d", (int)t->key);
+      break;
+    }
+    
+    t = dict_read_next(iterator);
+  }
+}
+
+static void inbox_dropped_handler(AppMessageResult reason, void *context)
+{
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped");
+}
+
+static void outbox_failed_handler(DictionaryIterator *iterator, AppMessageResult reason, void *context)
+{
+  APP_LOG(APP_LOG_LEVEL_ERROR, "outbox send failed");
+}
+
+static void outbox_sent_handler(DictionaryIterator *iterator, void *context)
+{
+  APP_LOG(APP_LOG_LEVEL_INFO, "outbox send success");
+}
+
+static void select_click_handler(ClickRecognizerRef recognizer, void *context)
+{
+  send(KEY_BUTTON, BUTTON_SELECT);
+  text_layer_set_text(s_text_layer, "select");
+  printf("select");
+}
+
+static void up_click_handler(ClickRecognizerRef recognizer, void *context)
+{
+  send(KEY_BUTTON, BUTTON_UP);
+  text_layer_set_text(s_text_layer, "up");
+  printf("up");
+}
+
+static void down_click_handler(ClickRecognizerRef recognizer, void *context)
+{
+  send(KEY_BUTTON, BUTTON_DOWN);
+  text_layer_set_text(s_text_layer, "down");
+  printf("down");
+}
+
+static void click_config_provider(void *context)
+{
+  window_single_click_subscribe(BUTTON_ID_SELECT, select_click_handler);
+  window_single_click_subscribe(BUTTON_ID_UP, up_click_handler);
+  window_single_click_subscribe(BUTTON_ID_DOWN, down_click_handler);
+}
+
+static void main_window_load(Window *window)
+{
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_frame(window_layer);
+  
+  s_text_layer = text_layer_create(bounds);
+  text_layer_set_font(s_text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+  text_layer_set_text(s_text_layer, "wassup");
+  text_layer_set_text_alignment(s_text_layer, GTextAlignmentCenter);
+  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_text_layer));
+  #ifdef PBL_ROUND
+  text_layer_enable_screen_text_flow_and_paging(s_text_layer, 5);
+  #endif
+}
+
+static void main_window_unload(Window *window)
+{
+  text_layer_destroy(s_text_layer);
+}
+
+static void init(void)
+{
+  app_message_register_inbox_received(inbox_received_handler);
+  app_message_register_inbox_dropped(inbox_dropped_handler);
+  app_message_register_outbox_failed(outbox_failed_handler);
+  app_message_register_outbox_sent(outbox_sent_handler);
+  
+  app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
+  
+  s_main_window = window_create();
+  window_set_click_config_provider(s_main_window, click_config_provider);
+  window_set_window_handlers(s_main_window, (WindowHandlers)
+                            {
+                              .load = main_window_load,
+                              .unload = main_window_unload,
+                            });
+  window_stack_push(s_main_window, true);
+}
+
+static void deinit(void)
+{
+  window_destroy(s_main_window);
+}
+
+int main(void)
+{
+  init();
+  app_event_loop();
+  deinit();
+}
